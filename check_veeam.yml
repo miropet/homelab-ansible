@@ -35,11 +35,15 @@
               <th style="padding:12px;text-align:left;">Status</th>
               <th style="padding:12px;text-align:left;">Finalizat</th>
             </tr>
-            {% set data = veeam_json.stdout | from_json %}
+           {% set data = veeam_json.stdout | from_json %}
             {% for item in (data if data is iterable else [data]) %}
             <tr style="border-bottom:1px solid #dee2e6;">
               <td style="padding:12px;"><b>{{ item.Name }}</b></td>
-              <td style="padding:12px;font-weight:bold;color:{{ '#28a745' if item.Result == 'Success' else '#dc3545' }};">{{ item.Result }}</td>
+              
+              <td style="padding:12px; font-weight:bold; color: {{ '#28a745' if item.Result == 0 else '#dc3545' }};">
+                {{ "Success" if item.Result == 0 else ("Warning" if item.Result == 1 else "Failed") }}
+              </td>
+
               <td style="padding:12px;">{{ item.Time }}</td>
             </tr>
             {% endfor %}
