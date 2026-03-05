@@ -1,48 +1,43 @@
 ---
 - name: Raport Status Backup si Replicare Veeam
   hosts: 10.2.1.21
+  gather_facts: no
   tasks:
-    - name: Rulare comanda interogare Veeam (PowerShell 7)
+    - name: Extragere Date Brute Veeam
       ansible.windows.win_shell: |
         $WarningPreference = 'SilentlyContinue'
-        try {
-            Import-Module Veeam.Backup.PowerShell -DisableNameChecking -ErrorAction Stop
-            $jobs = Get-VBRJob -ErrorAction Stop
-            
-            if (-not $jobs) {
-                $finalOut = @"
-        <p>Lista goala. Verifica permisiunile in consola Veeam.</p>
-        "@
-            } else {
-                $tableRows = foreach ($job in $jobs) {
-                    $lastSession = $job.FindLastSession()
-                    $status = if ($lastSession) { $lastSession.Result } else { "Nicio sesiune" }
-                    $time = if ($lastSession) { $lastSession.EndTime.ToString('dd.MM.yyyy HH:mm') } else { "-" }
-                    $color = switch ($status) { 'Success' {'#28a745'} 'Warning' {'#ffc107'} 'Failed' {'#dc3545'} Default {'#6c757d'} }
-                    
-                    "<tr><td style='padding:12px;'><b>$($job.Name)</b></td><td style='padding:12px;color:$color;font-weight:bold;'>$status</td><td style='padding:12px;'>$time</td></tr>"
-                }
-                
-                $rowsHtml = $tableRows -join ""
-                $finalOut = @"
-        <h3 style='font-family:Arial;color:#004085;'>🛡️ Raport Veeam Islaz</h3>
-        <table style='border-collapse:collapse;width:100%;font-family:Arial;box-shadow:0 2px 5px rgba(0,0,0,0.1);'>
-        <tr style='background:#f8f9fa;border-bottom:2px solid #dee2e6;'><th style='padding:12px;text-align:left;'>Job</th><th style='padding:12px;text-align:left;'>Status</th><th style='padding:12px;text-align:left;'>Finalizat</th></tr>
-        $rowsHtml
-        </table>
-        "@
+        Import-Module Veeam.Backup.PowerShell -DisableNameChecking
+        $jobs = Get-VBRJob
+        $data = foreach ($job in $jobs) {
+            $last = $job.FindLastSession()
+            [PSCustomObject]@{
+                Name   = $job.Name
+                Result = if ($last) { $last.Result } else { "Nicio sesiune" }
+                Time   = if ($last) { $last.EndTime.ToString('dd.MM.yyyy HH:mm') } else { "-" }
             }
-            Write-Output $finalOut
-        } catch {
-            $msg = $_.Exception.Message
-            Write-Output "Eroare Veeam: $msg"
         }
+        $data | ConvertTo-Json
       args:
         executable: pwsh.exe
-      register: veeam_raport
+      register: veeam_json
 
-    - name: Salvare raport pe Mac Mini
-      copy:
-        content: "{{ veeam_raport.stdout }}"
-        dest: "/tmp/veeam_raport.txt"
+    - name: Generare Tabel HTML pe Mac Mini
       delegate_to: localhost
+      copy:
+        dest: "/tmp/veeam_raport.txt"
+        content: |
+          <h3 style='font-family:Arial;color:#004085;'>🛡️ Raport Veeam Islaz</h3>
+          <table style='border-collapse:collapse;width:100%;font-family:Arial;'>
+            <tr style='background:#f8f9fa;border-bottom:2px solid #dee2e6;'>
+              <th style='padding:12px;text-align:left;'>Job</th>
+              <th style='padding:12px;text-align:left;'>Status</th>
+              <th style='padding:12px;text-align:left;'>Finalizat</th>
+            </tr>
+            {% for item in (veeam_json.stdout | from_json) %}
+            <tr style='border-bottom:1px solid #dee2e6;'>
+              <td style='padding:12px;'><b>{{ item.Name }}</b></td>
+              <td style='padding:12px; font-weight:bold; color: {{ "#28a745" if item.Result == "Success" else "#dc3545" }};'>{{ item.Result }}</td>
+              <td style='padding:12px;'>{{ item.Time }}</td>
+            </tr>
+            {% endfor %}
+          </table>
