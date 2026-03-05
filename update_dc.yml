@@ -33,11 +33,11 @@
             {% set info = hostvars[host].server_info %}
             <tr style="border-bottom:1px solid #dee2e6;">
               <td style="padding:12px;"><b>{{ info.name }}</b></td>
-              <td style="padding:12px; font-weight:bold; color: {{ '#28a745' if info.count == '0' else '#dc3545' }};">
-                {{ "Success (La zi)" if info.count == "0" else info.count + " Update-uri" }}
+              <td style="padding:12px; font-weight:bold; color: {{ '#28a745' if info.count|int == 0 else '#dc3545' }};">
+                {{ "Success (La zi)" if info.count|int == 0 else (info.count | string + " Update-uri") }}
               </td>
               <td style="padding:12px; font-size:0.85em; color:#666;">
-                {{ info.kb_list if info.count != "0" else "Sistem protejat" }}
+                {{ info.kb_list if info.count|int != 0 else "Sistem protejat" }}
               </td>
             </tr>
             {% endfor %}
