@@ -1,26 +1,56 @@
 ---
-- name: Raport Veeam
+- name: Raport Status Backup si Replicare Veeam
   hosts: 10.2.1.21
-  gather_facts: no
   tasks:
-    - name: Executie PowerShell 7
+    - name: Rulare comanda interogare Veeam (PowerShell 7)
       ansible.windows.win_shell: |
         $WarningPreference = 'SilentlyContinue'
-        Import-Module Veeam.Backup.PowerShell -DisableNameChecking
-        $jobs = Get-VBRJob
-        $out = "<h3>🛡️ Status Veeam Islaz</h3><table border='1' style='border-collapse:collapse;font-family:Arial;'><tr><th>Job</th><th>Status</th><th>Data</th></tr>"
-        foreach ($job in $jobs) {
-            $s = $job.FindLastSession()
-            $out += "<tr><td>$($job.Name)</td><td>$($s.Result)</td><td>$($s.EndTime)</td></tr>"
+        try {
+            Import-Module Veeam.Backup.PowerShell -DisableNameChecking -ErrorAction Stop
+            $jobs = Get-VBRJob -ErrorAction Stop
+            if (-not $jobs) {
+                Write-Output "<p>Lista goala. Verifica permisiunile.</p>"
+            } else {
+                $out = "<h3 style='font-family: Arial, sans-serif; color: #004085;'>🛡️ Raport Veeam Datacenter Islaz</h3>"
+                $out += "<table style='border-collapse: collapse; width: 100%; max-width: 600px; font-family: Arial, sans-serif; box-shadow: 0 2px 5px rgba(0,0,0,0.1);'>"
+                $out += "<tr style='background-color: #f8f9fa; border-bottom: 2px solid #dee2e6;'><th style='padding: 12px; text-align: left;'>Nume Job</th><th style='padding: 12px; text-align: left;'>Status</th><th style='padding: 12px; text-align: left;'>Finalizat</th></tr>"
+                
+                foreach ($job in $jobs) {
+                    $lastSession = $job.FindLastSession()
+                    if ($lastSession) {
+                        $status = $lastSession.Result
+                        $time = $lastSession.EndTime.ToString('dd.MM.yyyy HH:mm')
+                    } else {
+                        $status = "Nicio sesiune"
+                        $time = "-"
+                    }
+                    
+                    $color = switch ($status) {
+                        'Success' { '#28a745' }
+                        'Warning' { '#ffc107' }
+                        'Failed'  { '#dc3545' }
+                        Default   { '#6c757d' }
+                    }
+                    
+                    $out += "<tr style='border-bottom: 1px solid #dee2e6;'>"
+                    $out += "<td style='padding: 12px;'><b>$($job.Name)</b></td>"
+                    $out += "<td style='padding: 12px; color: $color; font-weight: bold;'>$status</td>"
+                    $out += "<td style='padding: 12px; color: #495057;'>$time</td>"
+                    $out += "</tr>"
+                }
+                $out += "</table>"
+                Write-Output "$out"
+            }
+        } catch {
+            $err = "<p style='color: red; font-family: Arial;'>Eroare: $($_.Exception.Message)</p>"
+            Write-Output "$err"
         }
-        $out += "</table>"
-        Write-Output $out
       args:
         executable: pwsh.exe
-      register: v_out
+      register: veeam_raport
 
-    - name: Salvare Local Mac
-      delegate_to: localhost
+    - name: Salvare raport curat pe Mac Mini
       copy:
-        content: "{{ v_out.stdout }}"
+        content: "{{ veeam_raport.stdout }}"
         dest: "/tmp/veeam_raport.txt"
+      delegate_to: localhost
