@@ -1,0 +1,12 @@
+---
+- name: Update Windows Server Domain Controller
+  hosts: all
+  tasks:
+    - name: Install Security and Critical Updates
+      ansible.windows.win_updates:
+        category_names:
+          - SecurityUpdates
+          - CriticalUpdates
+        state: installed
+        reboot: yes
+        reboot_timeout: 3600
