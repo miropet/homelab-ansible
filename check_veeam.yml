@@ -3,12 +3,12 @@
   hosts: 10.2.1.21
   gather_facts: no
   tasks:
-    - name: Extragere Date Brute Veeam
+    - name: Extragere Date Brute Veeam (JSON)
       ansible.windows.win_shell: |
         $WarningPreference = 'SilentlyContinue'
         Import-Module Veeam.Backup.PowerShell -DisableNameChecking
         $jobs = Get-VBRJob
-        $data = foreach ($job in $jobs) {
+        $results = foreach ($job in $jobs) {
             $last = $job.FindLastSession()
             [PSCustomObject]@{
                 Name   = $job.Name
@@ -16,7 +16,7 @@
                 Time   = if ($last) { $last.EndTime.ToString('dd.MM.yyyy HH:mm') } else { "-" }
             }
         }
-        $data | ConvertTo-Json
+        $results | ConvertTo-Json
       args:
         executable: pwsh.exe
       register: veeam_json
@@ -26,14 +26,15 @@
       copy:
         dest: "/tmp/veeam_raport.txt"
         content: |
-          <h3 style='font-family:Arial;color:#004085;'>🛡️ Raport Veeam Islaz</h3>
-          <table style='border-collapse:collapse;width:100%;font-family:Arial;'>
+          <h3 style='font-family:Arial;color:#004085;'>🛡️ Raport Veeam Datacenter Islaz</h3>
+          <table style='border-collapse:collapse;width:100%;font-family:Arial;box-shadow:0 2px 5px rgba(0,0,0,0.1);'>
             <tr style='background:#f8f9fa;border-bottom:2px solid #dee2e6;'>
               <th style='padding:12px;text-align:left;'>Job</th>
               <th style='padding:12px;text-align:left;'>Status</th>
               <th style='padding:12px;text-align:left;'>Finalizat</th>
             </tr>
-            {% for item in (veeam_json.stdout | from_json) %}
+            {% set data = veeam_json.stdout | from_json %}
+            {% for item in (data if data is iterable else [data]) %}
             <tr style='border-bottom:1px solid #dee2e6;'>
               <td style='padding:12px;'><b>{{ item.Name }}</b></td>
               <td style='padding:12px; font-weight:bold; color: {{ "#28a745" if item.Result == "Success" else "#dc3545" }};'>{{ item.Result }}</td>
