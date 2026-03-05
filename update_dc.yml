@@ -3,37 +3,42 @@
   hosts: domain_controllers
   gather_facts: yes
   tasks:
-    - name: Verificare Update-uri
+    - name: Verificare Update-uri Disponibile
       ansible.windows.win_updates:
         state: searched
       register: update_results
-      ignore_errors: yes
 
-    - name: Fragment HTML
+    - name: Pregatire Date Server
       set_fact:
-        server_html: |
-          <tr style='border-bottom: 1px solid #dee2e6;'>
-            <td style='padding: 12px;'><b>{{ inventory_hostname }}</b></td>
-            <td style='padding: 12px; color: {{ "#28a745" if (update_results.found_update_count | default(0)) == 0 else "#dc3545" }}; font-weight: bold;'>
-              {{ "La zi" if (update_results.found_update_count | default(0)) == 0 else (update_results.found_update_count | string + " update-uri") }}
-            </td>
-            <td style='padding: 12px; font-size: 0.85em; color: #495057;'>
-              {% if update_results.found_update_count | default(0) > 0 %}
-                {% for key, val in update_results.updates.items() %}{{ val.title[:50] }}...<br>{% endfor %}
-              {% else %} Sistem protejat. {% endif %}
-            </td>
-          </tr>
+        server_info:
+          name: "{{ inventory_hostname }}"
+          count: "{{ update_results.found_update_count | default(0) }}"
+          kb_list: "{% for key, val in (update_results.updates | default({})).items() %}{{ val.title[:40] }}{% if not loop.last %}, {% endif %}{% endfor %}"
 
-- name: Salvare Finala
+- name: Generare Raport Final pe Mac Mini
   hosts: localhost
   tasks:
-    - name: Scriere Raport
+    - name: Scriere Tabel HTML
       copy:
-        content: |
-          <h3 style='font-family: Arial;'>🛡️ Status Securitate Hommikust</h3>
-          <table style='border-collapse: collapse; width: 100%; font-family: Arial;'>
-            <tr style='background: #f8f9fa;'><th>Server</th><th>Status</th><th>Detalii</th></tr>
-            {{ hostvars['10.1.1.5'].server_html | default('<tr><td>10.1.1.5</td><td>Eroare conexiune</td><td>-</td></tr>') }}
-            {{ hostvars['10.2.1.5'].server_html | default('<tr><td>10.2.1.5</td><td>Eroare conexiune</td><td>-</td></tr>') }}
-          </table>
         dest: "/tmp/windows_updates_report.txt"
+        content: |
+          <h3 style="font-family:Arial;color:#004085;">🛡️ Status Update-uri Windows - Hommikust</h3>
+          <table style="border-collapse:collapse;width:100%;font-family:Arial;">
+            <tr style="background:#f8f9fa;border-bottom:2px solid #dee2e6;">
+              <th style="padding:12px;text-align:left;">Server</th>
+              <th style="padding:12px;text-align:left;">Status</th>
+              <th style="padding:12px;text-align:left;">Detalii KB</th>
+            </tr>
+            {% for host in groups['domain_controllers'] %}
+            {% set info = hostvars[host].server_info %}
+            <tr style="border-bottom:1px solid #dee2e6;">
+              <td style="padding:12px;"><b>{{ info.name }}</b></td>
+              <td style="padding:12px; font-weight:bold; color: {{ '#28a745' if info.count == '0' else '#dc3545' }};">
+                {{ "Success (La zi)" if info.count == "0" else info.count + " Update-uri" }}
+              </td>
+              <td style="padding:12px; font-size:0.85em; color:#666;">
+                {{ info.kb_list if info.count != "0" else "Sistem protejat" }}
+              </td>
+            </tr>
+            {% endfor %}
+          </table>
