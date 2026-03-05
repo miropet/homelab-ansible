@@ -10,6 +10,8 @@
         else { $sesiuni | ForEach-Object { "Job: $($_.JobName) | Tip: $($_.JobTypeString) | Status: $($_.Result) | Finalizat: $($_.EndTime.ToString('HH:mm'))" } }
       register: veeam_raport
 
-    - name: Afisare rezultate pentru email
-      debug:
-        msg: "{{ veeam_raport.stdout_lines | join('\n') }}"
+    - name: Salvare raport curat pe Mac Mini
+      copy:
+        content: "{{ veeam_raport.stdout_lines | join('<br>') }}"
+        dest: "/tmp/veeam_raport.txt"
+      delegate_to: localhost
