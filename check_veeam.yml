@@ -12,18 +12,13 @@
                 Write-Output "<p>Lista goala. Verifica permisiunile.</p>"
             } else {
                 $out = "<h3 style='font-family: Arial, sans-serif; color: #004085;'>🛡️ Raport Veeam Datacenter Islaz</h3>"
-                $out += "<table style='border-collapse: collapse; width: 100%; max-width: 600px; font-family: Arial, sans-serif; box-shadow: 0 2px 5px rgba(0,0,0,0.1);'>"
-                $out += "<tr style='background-color: #f8f9fa; border-bottom: 2px solid #dee2e6;'><th style='padding: 12px; text-align: left;'>Nume Job</th><th style='padding: 12px; text-align: left;'>Status</th><th style='padding: 12px; text-align: left;'>Finalizat</th></tr>"
+                $out += "<table style='border-collapse: collapse; width: 100%; max-width: 600px; font-family: Arial, sans-serif;'>"
+                $out += "<tr style='background-color: #f8f9fa; border-bottom: 2px solid #dee2e6;'><th style='padding: 12px; text-align: left;'>Job</th><th style='padding: 12px; text-align: left;'>Status</th><th style='padding: 12px; text-align: left;'>Finalizat</th></tr>"
                 
                 foreach ($job in $jobs) {
                     $lastSession = $job.FindLastSession()
-                    if ($lastSession) {
-                        $status = $lastSession.Result
-                        $time = $lastSession.EndTime.ToString('dd.MM.yyyy HH:mm')
-                    } else {
-                        $status = "Nicio sesiune"
-                        $time = "-"
-                    }
+                    $status = if ($lastSession) { $lastSession.Result } else { "Nicio sesiune" }
+                    $time = if ($lastSession) { $lastSession.EndTime.ToString('dd.MM.yyyy HH:mm') } else { "-" }
                     
                     $color = switch ($status) {
                         'Success' { '#28a745' }
@@ -49,7 +44,7 @@
         executable: pwsh.exe
       register: veeam_raport
 
-    - name: Salvare raport curat pe Mac Mini
+    - name: Salvare raport pe Mac Mini
       copy:
         content: "{{ veeam_raport.stdout }}"
         dest: "/tmp/veeam_raport.txt"
