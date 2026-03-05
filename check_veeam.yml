@@ -10,10 +10,12 @@
         $jobs = Get-VBRJob
         $results = foreach ($job in $jobs) {
             $last = $job.FindLastSession()
+            $statusText = if ($last) { $last.Result } else { "Nicio sesiune" }
+            $timeText = if ($last) { $last.EndTime.ToString("dd.MM.yyyy HH:mm") } else { "N/A" }
             [PSCustomObject]@{
                 Name   = $job.Name
-                Result = if ($last) { $last.Result } else { "Nicio sesiune" }
-                Time   = if ($last) { $last.EndTime.ToString('dd.MM.yyyy HH:mm') } else { "-" }
+                Result = $statusText
+                Time   = $timeText
             }
         }
         $results | ConvertTo-Json
@@ -26,7 +28,7 @@
       copy:
         dest: "/tmp/veeam_raport.txt"
         content: |
-          <h3 style='font-family:Arial;color:#004085;'>🛡️ Raport Veeam Datacenter Islaz</h3>
+          <h3 style='font-family:Arial;color:#004085;'>🛡️ Raport Veeam Islaz</h3>
           <table style='border-collapse:collapse;width:100%;font-family:Arial;box-shadow:0 2px 5px rgba(0,0,0,0.1);'>
             <tr style='background:#f8f9fa;border-bottom:2px solid #dee2e6;'>
               <th style='padding:12px;text-align:left;'>Job</th>
