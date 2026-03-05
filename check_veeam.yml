@@ -3,18 +3,30 @@
   hosts: 10.2.1.21
   tasks:
     - name: Rulare comanda interogare Veeam
-      ansible.windows.win_shell: >
-        Import-Module Veeam.Backup.PowerShell -WarningAction SilentlyContinue ;
-        $jobs = Get-VBRJob ;
-        $rezultate = foreach ($job in $jobs) {
-            $lastSession = $job.FindLastSession() ;
-            if ($lastSession) {
-                "Job: $($job.Name) | Status: $($lastSession.Result) | Finalizat: $($lastSession.EndTime.ToString('dd.MM.yyyy HH:mm'))"
-            } else {
-                "Job: $($job.Name) | Status: Nicio sesiune gasita vreodata"
+      ansible.windows.win_shell: |
+        try {
+            if (Get-Module -ListAvailable -Name "Veeam.Backup.PowerShell") { 
+                Import-Module Veeam.Backup.PowerShell -ErrorAction Stop 
+            } else { 
+                Add-PSSnapin VeeamPSSnapIn -ErrorAction Stop 
             }
-        } ;
-        if (-not $rezultate) { Write-Output "Nu s-au gasit job-uri configurate in Veeam." } else { $rezultate }
+            
+            $jobs = Get-VBRJob -ErrorAction Stop
+            if (-not $jobs) { 
+                Write-Output "Lista goala. Contul curent folosit in Ansible este adaugat in Veeam Console -> Main Menu -> Users and Roles?" 
+            } else { 
+                foreach ($job in $jobs) {
+                    $lastSession = $job.FindLastSession()
+                    if ($lastSession) { 
+                        Write-Output "Job: $($job.Name) | Status: $($lastSession.Result) | Finalizat: $($lastSession.EndTime.ToString('dd.MM.yyyy HH:mm'))" 
+                    } else { 
+                        Write-Output "Job: $($job.Name) | Status: Nicio sesiune" 
+                    }
+                }
+            }
+        } catch {
+            Write-Output "Eroare Veeam: $($_.Exception.Message)"
+        }
       register: veeam_raport
 
     - name: Salvare raport curat pe Mac Mini
