@@ -1,34 +1,46 @@
-cd $HOME/homelab-ansible ; git reset --hard origin/main ; git pull
-export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES ; /opt/homebrew/bin/ansible-playbook -i hosts.ini check_veeam.yml -l 10.2.1.21
-HEAD is now at 13a1b89 Update Veeam report format and JSON extraction
-remote: Enumerating objects: 5, done.
-remote: Counting objects: 100% (5/5), done.
-remote: Compressing objects: 100% (3/3), done.
-remote: Total 3 (delta 1), reused 0 (delta 0), pack-reused 0 (from 0)
-Unpacking objects: 100% (3/3), 1.08 KiB | 220.00 KiB/s, done.
-From https://github.com/miropet/homelab-ansible
-   13a1b89..d6779f5  main       -> origin/main
-Updating 13a1b89..d6779f5
-Fast-forward
- check_veeam.yml | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+---
+- name: Raport Status Backup si Replicare Veeam
+  hosts: 10.2.1.21
+  gather_facts: no
+  tasks:
+    - name: Extragere Date Veeam
+      ansible.windows.win_shell: |
+        $WarningPreference = 'SilentlyContinue'
+        Import-Module Veeam.Backup.PowerShell -DisableNameChecking
+        $jobs = Get-VBRJob
+        $results = foreach ($job in $jobs) {
+            $last = $job.FindLastSession()
+            $statusText = if ($last) { $last.Result } else { "Nicio sesiune" }
+            $timeText = if ($last) { $last.EndTime.ToString() } else { "N/A" }
+            [PSCustomObject]@{
+                Name   = $job.Name
+                Result = $statusText
+                Time   = $timeText
+            }
+        }
+        $results | ConvertTo-Json
+      args:
+        executable: pwsh.exe
+      register: veeam_json
 
-PLAY [Raport Status Backup si Replicare Veeam] ****************************************************************************************************************************************************
-
-TASK [Extragere Date Brute Veeam (JSON)] **********************************************************************************************************************************************************
-[ERROR]: Task failed: Module failed: non-zero return code
-Origin: /Users/andrei/homelab-ansible/check_veeam.yml:6:7
-
-4   gather_facts: no
-5   tasks:
-6     - name: Extragere Date Brute Veeam (JSON)
-        ^ column 7
-
-fatal: [10.2.1.21]: FAILED! => {"changed": true, "cmd": "$WarningPreference = 'SilentlyContinue'\nImport-Module Veeam.Backup.PowerShell -DisableNameChecking\n$jobs = Get-VBRJob\n$results = foreach ($job in $jobs) {\n    $last = $job.FindLastSession()\n    $statusText = if ($last) { $last.Result } else { \"Nicio sesiune\" }\n    $timeText = if ($last) { $last.EndTime.ToString(\"dd.MM.yyyy HH:mm\") } else { \"N/A\" }\n    [PSCustomObject]@{\n        Name   = $job.Name\n        Result = $statusText\n        Time   = $timeText\n    }\n}\n$results | ConvertTo-Json", "delta": "0:00:00.559009", "end": "2026-03-05 16:14:41.662348", "msg": "non-zero return code", "rc": 1, "start": "2026-03-05 16:14:41.103339", "stderr": "\u001b[31;1mParserError: \u001b[0m\r\n\u001b[31;1m\u001b[36;1mLine |\u001b[0m\r\n\u001b[31;1m\u001b[36;1m\u001b[36;1m   7 | \u001b[0m  $timeText = if ($last) { $last.EndTime.ToString(\u001b[36;1md\u001b[0md.MM.yyyy HH:mm) }  …\u001b[0m\r\n\u001b[31;1m\u001b[36;1m\u001b[36;1m\u001b[0m\u001b[36;1m\u001b[0m\u001b[36;1m     | \u001b[31;1m                                                  ~\u001b[0m\r\n\u001b[31;1m\u001b[36;1m\u001b[36;1m\u001b[0m\u001b[36;1m\u001b[0m\u001b[36;1m\u001b[31;1m\u001b[31;1m\u001b[36;1m     | \u001b[31;1mMissing ')' in method call.\u001b[0m\r\n", "stderr_lines": ["\u001b[31;1mParserError: \u001b[0m", "\u001b[31;1m\u001b[36;1mLine |\u001b[0m", "\u001b[31;1m\u001b[36;1m\u001b[36;1m   7 | \u001b[0m  $timeText = if ($last) { $last.EndTime.ToString(\u001b[36;1md\u001b[0md.MM.yyyy HH:mm) }  …\u001b[0m", "\u001b[31;1m\u001b[36;1m\u001b[36;1m\u001b[0m\u001b[36;1m\u001b[0m\u001b[36;1m     | \u001b[31;1m                                                  ~\u001b[0m", "\u001b[31;1m\u001b[36;1m\u001b[36;1m\u001b[0m\u001b[36;1m\u001b[0m\u001b[36;1m\u001b[31;1m\u001b[31;1m\u001b[36;1m     | \u001b[31;1mMissing ')' in method call.\u001b[0m"], "stdout": "", "stdout_lines": []}
-
-PLAY RECAP ****************************************************************************************************************************************************************************************
-10.2.1.21                  : ok=0    changed=0    unreachable=0    failed=1    skipped=0    rescued=0    ignored=0
-
-andrei@Andreis-Mac-mini homelab-ansible % cat /tmp/veeam_raport.txt
-cat: /tmp/veeam_raport.txt: No such file or directory
-andrei@Andreis-Mac-mini homelab-ansible %
+    - name: Generare Tabel HTML
+      delegate_to: localhost
+      copy:
+        dest: "/tmp/veeam_raport.txt"
+        content: |
+          <h3 style="font-family:Arial;color:#004085;">🛡️ Raport Veeam Islaz</h3>
+          <table style="border-collapse:collapse;width:100%;font-family:Arial;">
+            <tr style="background:#f8f9fa;border-bottom:2px solid #dee2e6;">
+              <th style="padding:12px;text-align:left;">Job</th>
+              <th style="padding:12px;text-align:left;">Status</th>
+              <th style="padding:12px;text-align:left;">Finalizat</th>
+            </tr>
+            {% set data = veeam_json.stdout | from_json %}
+            {% for item in (data if data is iterable else [data]) %}
+            <tr style="border-bottom:1px solid #dee2e6;">
+              <td style="padding:12px;"><b>{{ item.Name }}</b></td>
+              <td style="padding:12px;font-weight:bold;color:{{ '#28a745' if item.Result == 'Success' else '#dc3545' }};">{{ item.Result }}</td>
+              <td style="padding:12px;">{{ item.Time }}</td>
+            </tr>
+            {% endfor %}
+          </table>
