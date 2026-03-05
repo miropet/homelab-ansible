@@ -1,5 +1,5 @@
 ---
-- name: Update Windows Server Domain Controller
+- name: Update Windows Servers
   hosts: all
   tasks:
     - name: Install Security and Critical Updates
@@ -10,3 +10,8 @@
         state: installed
         reboot: yes
         reboot_timeout: 3600
+      register: update_results
+
+    - name: Genereaza raportul de status
+      debug:
+        msg: "Server: {{ inventory_hostname }} | Restartat: {{ update_results.reboot_required }} | Update-uri: {{ update_results.updates | map(attribute='title') | join(', ') | default('Era deja la zi, zero update-uri', true) }}"
