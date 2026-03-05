@@ -1,48 +1,39 @@
 ---
 - name: Raport Stilizat Windows Updates
   hosts: domain_controllers
+  gather_facts: yes
   tasks:
-    - name: Verificare Update-uri Disponibile
+    - name: Verificare Update-uri
       ansible.windows.win_updates:
         state: searched
       register: update_results
+      ignore_errors: yes
 
-    - name: Generare Fragment HTML pentru fiecare server
+    - name: Fragment HTML
       set_fact:
         server_html: |
           <tr style='border-bottom: 1px solid #dee2e6;'>
             <td style='padding: 12px;'><b>{{ inventory_hostname }}</b></td>
-            <td style='padding: 12px; color: {{ "#28a745" if update_results.found_update_count == 0 else "#dc3545" }}; font-weight: bold;'>
-              {{ "La zi (Up to date)" if update_results.found_update_count == 0 else update_results.found_update_count | string + " update-uri disponibile" }}
+            <td style='padding: 12px; color: {{ "#28a745" if (update_results.found_update_count | default(0)) == 0 else "#dc3545" }}; font-weight: bold;'>
+              {{ "La zi" if (update_results.found_update_count | default(0)) == 0 else (update_results.found_update_count | string + " update-uri") }}
             </td>
-            <td style='padding: 12px; font-size: 0.9em; color: #495057;'>
-              {% if update_results.found_update_count > 0 %}
-                <ul style='margin: 0; padding-left: 20px;'>
-                {% for key, val in update_results.updates.items() %}
-                  <li>{{ val.title[:80] }}...</li>
-                {% endfor %}
-                </ul>
-              {% else %}
-                Sistemul este securizat.
-              {% endif %}
+            <td style='padding: 12px; font-size: 0.85em; color: #495057;'>
+              {% if update_results.found_update_count | default(0) > 0 %}
+                {% for key, val in update_results.updates.items() %}{{ val.title[:50] }}...<br>{% endfor %}
+              {% else %} Sistem protejat. {% endif %}
             </td>
           </tr>
 
-- name: Centralizare Raport pe Mac Mini
+- name: Salvare Finala
   hosts: localhost
-  gather_facts: false
   tasks:
-    - name: Asamblare Tabel Final
-      vars:
-        html_header: |
-          <h3 style='font-family: Arial, sans-serif; color: #004085;'>🛡️ Status Securitate Windows - Hommikust Infrastructure</h3>
-          <table style='border-collapse: collapse; width: 100%; max-width: 800px; font-family: Arial, sans-serif; box-shadow: 0 2px 5px rgba(0,0,0,0.1);'>
-            <tr style='background-color: #f8f9fa; border-bottom: 2px solid #dee2e6;'>
-              <th style='padding: 12px; text-align: left;'>Server</th>
-              <th style='padding: 12px; text-align: left;'>Status</th>
-              <th style='padding: 12px; text-align: left;'>Detalii / KB-uri</th>
-            </tr>
-        html_footer: "</table><p style='font-family: Arial; font-size: 0.8em; color: #6c757d;'>Generat automat de Mac Mini M4 via Ansible & WireGuard.</p>"
+    - name: Scriere Raport
       copy:
-        content: "{{ html_header }}{{ hostvars['10.1.1.5'].server_html }}{{ hostvars['10.2.1.5'].server_html }}{{ html_footer }}"
+        content: |
+          <h3 style='font-family: Arial;'>🛡️ Status Securitate Hommikust</h3>
+          <table style='border-collapse: collapse; width: 100%; font-family: Arial;'>
+            <tr style='background: #f8f9fa;'><th>Server</th><th>Status</th><th>Detalii</th></tr>
+            {{ hostvars['10.1.1.5'].server_html | default('<tr><td>10.1.1.5</td><td>Eroare conexiune</td><td>-</td></tr>') }}
+            {{ hostvars['10.2.1.5'].server_html | default('<tr><td>10.2.1.5</td><td>Eroare conexiune</td><td>-</td></tr>') }}
+          </table>
         dest: "/tmp/windows_updates_report.txt"
