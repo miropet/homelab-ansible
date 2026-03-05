@@ -3,8 +3,26 @@
   hosts: 10.2.1.21
   tasks:
     - name: Rulare comanda interogare Veeam (PowerShell 7)
-      ansible.windows.win_shell: >
-        try { Import-Module Veeam.Backup.PowerShell -ErrorAction Stop ; $jobs = Get-VBRJob -ErrorAction Stop ; if (-not $jobs) { Write-Output "Lista goala. Verifica permisiunile contului in consola Veeam." } else { foreach ($job in $jobs) { $lastSession = $job.FindLastSession() ; if ($lastSession) { Write-Output "Job: $($job.Name) | Status: $($lastSession.Result) | Finalizat: $($lastSession.EndTime.ToString('dd.MM.yyyy HH:mm'))" } else { Write-Output "Job: $($job.Name) | Status: Nicio sesiune" } } } } catch { Write-Output "Eroare Veeam: $($_.Exception.Message)" }
+      ansible.windows.win_shell: |
+        $WarningPreference = 'SilentlyContinue'
+        try {
+            Import-Module Veeam.Backup.PowerShell -DisableNameChecking -ErrorAction Stop
+            $jobs = Get-VBRJob -ErrorAction Stop
+            if (-not $jobs) {
+                Write-Output "Lista goala. Verifica permisiunile."
+            } else {
+                foreach ($job in $jobs) {
+                    $lastSession = $job.FindLastSession()
+                    if ($lastSession) {
+                        Write-Output "Job: $($job.Name) - Status: $($lastSession.Result) - Finalizat: $($lastSession.EndTime.ToString('dd.MM.yyyy HH:mm'))"
+                    } else {
+                        Write-Output "Job: $($job.Name) - Status: Nicio sesiune"
+                    }
+                }
+            }
+        } catch {
+            Write-Output "Eroare: $($_.Exception.Message)"
+        }
       args:
         executable: pwsh.exe
       register: veeam_raport
